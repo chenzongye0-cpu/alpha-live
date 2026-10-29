@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0e11">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Alpha实时">
+<title>Alpha 实时行情</title>
+<link id="ico" rel="icon"><link id="aico" rel="apple-touch-icon"><link id="mf" rel="manifest">
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:#0b0e11;color:#eaecef;font:14px/1.4 -apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif;padding-bottom:env(safe-area-inset-bottom)}
+header{position:sticky;top:0;z-index:5;background:#0b0e11;padding:calc(8px + env(safe-area-inset-top)) 10px 6px;border-bottom:1px solid #222}
+.row{display:flex;gap:6px;align-items:center}
+h1{font-size:17px;margin:0;flex:1}
+.live{display:inline-block;width:9px;height:9px;border-radius:50%;background:#0ecb81;margin-right:5px;animation:pl 1.5s infinite}
+.live.off{background:#888;animation:none}.live.err{background:#f6465d}
+@keyframes pl{50%{opacity:.25}}
+.meta{font-size:12px;color:#848e9c}
+button,select,input{background:#1e2329;color:#eaecef;border:1px solid #2b3139;border-radius:8px;min-height:38px;padding:0 10px;font-size:14px}
+button:active{background:#2b3139}
+input{flex:1;min-width:0}
+.tabs{display:flex;overflow-x:auto;gap:4px;margin-top:6px}
+.tabs button{flex:1;white-space:nowrap;border:none;background:none;color:#848e9c}
+.tabs button.on{color:#f0b90b;border-bottom:2px solid #f0b90b;border-radius:0}
+#err{display:none;background:#3a1d22;color:#f6465d;padding:8px 10px;font-size:13px}
+#list .t{display:flex;align-items:center;gap:6px;padding:9px 10px;border-bottom:1px solid #1a1f25;min-height:56px}
+.star{font-size:20px;color:#444;width:30px;text-align:center;background:none;border:none;padding:0}
+.star.on{color:#f0b90b}
+.nm{flex:1;min-width:0}.nm b{font-size:15px}.nm div{font-size:11px;color:#848e9c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pr{text-align:right;min-width:92px;padding:2px 4px;border-radius:4px;transition:background .8s}
+.pr .p{font-size:15px;font-variant-numeric:tabular-nums}.pr .s{font-size:11px;color:#848e9c}
+.fu{background:rgba(14,203,129,.35);transition:none}.fd{background:rgba(246,70,93,.35);transition:none}
+.ch{min-width:66px;text-align:center;border-radius:6px;padding:6px 2px;font-weight:600;color:#fff}
+.g{color:#0ecb81}.r{color:#f6465d}.bg{background:#0ecb81}.br{background:#f6465d}.bn{background:#474d57}
+svg.sp{width:60px;height:26px}
+#feed .e{padding:9px 10px;border-bottom:1px solid #1a1f25;font-size:13px}
+.sheet{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;z-index:20}
+.sheet .in{position:absolute;left:0;right:0;bottom:0;max-height:88vh;overflow:auto;background:#161a1e;border-radius:16px 16px 0 0;padding:14px 14px calc(20px + env(safe-area-inset-bottom))}
+.kv{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}.kv div{background:#1e2329;border-radius:8px;padding:8px}.kv span{display:block;font-size:11px;color:#848e9c}
+.bar{height:6px;background:#2b3139;border-radius:3px;position:relative;margin:6px 0}.bar i{position:absolute;top:-4px;width:4px;height:14px;background:#f0b90b;border-radius:2px}
+#toast{position:fixed;left:10px;right:10px;top:calc(10px + env(safe-area-inset-top));z-index:30;display:flex;flex-direction:column;gap:6px;pointer-events:none}
+#toast div{background:#f0b90b;color:#000;padding:10px;border-radius:10px;font-weight:600;pointer-events:auto}
+.note{font-size:11px;color:#848e9c;margin:6px 0}
+label{display:flex;align-items:center;gap:8px;margin:8px 0}label input{max-width:90px}
+</style></head><body>
+<header>
+ <div class="row"><h1><span id="dot" class="live"></span>Alpha 实时行情</h1>
+  <select id="iv" aria-label="刷新间隔"><option value="10">10秒</option><option value="15" selected>15秒</option><option value="30">30秒</option><option value="60">60秒</option></select>
+  <button id="pause">暂停</button><button id="ref">⟳</button><button id="set">⚙</button></div>
+ <div class="meta" id="st">加载中…</div>
+ <div class="row" style="margin-top:6px"><input id="q" placeholder="搜索代币/名称" type="search"><select id="chain"><option value="">全部链</option></select></div>
+ <div class="row meta" style="margin-top:4px"><label style="margin:0"><input type="checkbox" id="showoff" style="min-height:auto"> 显示已下线</label></div>
+ <div class="tabs" id="tabs"><button data-t="up" class="on">涨幅榜</button><button data-t="down">跌幅榜</button><button data-t="vol">成交额</button><button data-t="all">全部</button><button data-t="fav">收藏</button><button data-t="ev">异动</button></div>
+</header>
+<div id="err"><span id="errm"></span> <button onclick="load()">重试</button></div>
+<div id="list"></div><div id="feed" style="display:none"></div>
+<div id="toast"></div>
+<div class="sheet" id="det"><div class="in" id="detin"></div></div>
+<div class="sheet" id="cfg"><div class="in">
+ <h3 style="margin:0 0 6px">提醒设置</h3>
+ <label>24h 涨幅 ≥ <input id="a1" type="number" inputmode="decimal">%</label>
+ <label>24h 跌幅 ≤ −<input id="a2" type="number" inputmode="decimal">%</label>
+ <label>较上次刷新变化 ≥ <input id="a3" type="number" inputmode="decimal">%</label>
+ <label><input type="checkbox" id="afav" style="min-height:auto"> 仅提醒收藏</label>
+ <div class="row"><button id="asave" style="flex:1">保存</button><button id="anoti" style="flex:1">开启系统通知</button></div>
+ <p class="note">留空即关闭该项。提醒和系统通知只在本页面打开时有效（无后台推送）。同一代币同一规则 30 分钟内只提醒一次。数据来自 Binance 官方公开接口，不构成投资建议。</p>
+ <button onclick="hide('cfg')" style="width:100%">关闭</button></div></div>
+<script>
+"use strict";
+const API="https://www.binance.com/bapi/defi/v1/public/wallet-direct/buw/wallet/cex/alpha/all/token/list";
+const LS=(k,d)=>{try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}};
+const SV=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+const $=id=>document.getElementById(id);
+let tokens=[],prev=null,tab="up",timer=null,paused=false,ivl=LS("al_iv",15),lastOk=0,loading=false;
+let favs=new Set(LS("al_fav",[])),alerts=LS("al_alerts",{up:20,down:15,step:5,favOnly:false});
+let hist=LS("al_hist",{}),opened=LS("al_open",{}),events=LS("al_ev",[]),fired={};
+const H_MAX=2*3600e3,H_CAP=480;
+const n=x=>{const v=parseFloat(x);return isFinite(v)?v:0};
+function fp(p){if(!p)return"0";if(p>=1000)return p.toLocaleString("en-US",{maximumFractionDigits:2});if(p>=1)return p.toFixed(4);if(p>=0.01)return p.toFixed(5);
+ const s=p.toFixed(20).slice(2);let z=0;while(s[z]==="0")z++;const sub="₀₁₂₃₄₅₆₇₈₉";if(z<4)return p.toFixed(z+4);
+ return"0.0"+String(z).split("").map(d=>sub[d]).join("")+s.slice(z,z+4).replace(/0+$/,"");}
+function fu(v){const a=Math.abs(v);return"$"+(a>=1e9?(v/1e9).toFixed(2)+"B":a>=1e6?(v/1e6).toFixed(2)+"M":a>=1e3?(v/1e3).toFixed(1)+"K":v.toFixed(0))}
+const pc=v=>v==null||!isFinite(v)?"—":(v>0?"+":"")+v.toFixed(2)+"%";
+const cl=v=>v>0?"g":v<0?"r":"";
+const bj=t=>new Date(t).toLocaleTimeString("zh-CN",{timeZone:"Asia/Shanghai",hour12:false});
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>"&#"+c.charCodeAt(0)+";");
+// icon / manifest
+(function(){const c=document.createElement("canvas");c.width=c.height=192;const x=c.getContext("2d");x.fillStyle="#0b0e11";x.fillRect(0,0,192,192);x.fillStyle="#f0b90b";x.font="bold 120px sans-serif";x.textAlign="center";x.textBaseline="middle";x.fillText("α",96,100);
+ const u=c.toDataURL();$("ico").href=u;$("aico").href=u;
+ $("mf").href="data:application/manifest+json,"+encodeURIComponent(JSON.stringify({name:"Alpha 实时行情",short_name:"Alpha实时",display:"standalone",background_color:"#0b0e11",theme_color:"#0b0e11",start_url:location.href.split("#")[0],icons:[{src:u,sizes:"192x192",type:"image/png"}]}));})();
+function spark(a,w=60,h=26){if(!a||a.length<2)return`<svg class="sp" viewBox="0 0 ${w} ${h}"></svg>`;const ps=a.map(x=>x[1]);const mn=Math.min(...ps),mx=Math.max(...ps),rg=mx-mn||1;
+ const pts=ps.map((p,i)=>(i*w/(ps.length-1)).toFixed(1)+","+(h-2-(p-mn)/rg*(h-4)).toFixed(1)).join(" ");const c=ps[ps.length-1]>=ps[0]?"#0ecb81":"#f6465d";
+ return`<svg class="sp" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:${w==60?60:"100%"}px;height:${h}px"><polyline fill="none" stroke="${c}" stroke-width="1.5" points="${pts}"/></svg>`}
+function toast(m){const d=document.createElement("div");d.textContent=m;$("toast").prepend(d);setTimeout(()=>d.remove(),6000);while($("toast").children.length>3)$("toast").lastChild.remove()}
+function alertHit(t,key,msg){if(alerts.favOnly&&!favs.has(t.id))return;const k=t.id+key;if(fired[k]&&Date.now()-fired[k]<1800e3)return;fired[k]=Date.now();toast(msg);
+ if("Notification"in window&&Notification.permission==="granted"){try{new Notification("Alpha 提醒",{body:msg})}catch(e){}}}
+function norm(r){return{id:r.alphaId||r.tokenId,sym:r.symbol,name:r.name,chain:r.chainName,chainId:r.chainId,ca:r.contractAddress,price:n(r.price),pct:n(r.percentChange24h),hi:n(r.priceHigh24h),lo:n(r.priceLow24h),vol:n(r.volume24h),liq:n(r.liquidity),hold:n(r.holders),mc:n(r.marketCap),online:!r.offline&&!r.fullyDelisted,fully:!!r.fullyDelisted,icon:r.iconUrl}}
+async function load(){if(loading)return;loading=true;$("dot").className="live";
+ try{const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),12000);
+  const res=await fetch(API,{cache:"no-store",signal:ctl.signal});clearTimeout(to);const j=await res.json();
+  if(j.code!=="000000"||!Array.isArray(j.data))throw new Error("接口返回异常 "+(j.code||res.status));
+  ingest(j.data.map(norm).filter(t=>t.id));$("err").style.display="none";lastOk=Date.now();
+ }catch(e){$("errm").textContent="获取失败："+(e.name==="AbortError"?"超时":e.message)+"，保留上次数据";$("err").style.display="block";$("dot").className="live err"}
+ loading=false;status();}
+function ingest(list){const now=Date.now();const pm=prev?new Map(prev.map(t=>[t.id,t])):null;const ev=[];
+ for(const t of list){const p=pm&&pm.get(t.id);
+  if(t.price>0){const h=hist[t.id]||(hist[t.id]=[]);h.push([now,t.price]);while(h.length&&(now-h[0][0]>H_MAX||h.length>H_CAP))h.shift();if(!opened[t.id])opened[t.id]=t.price;}
+  t.dPrev=p&&p.price?(t.price-p.price)/p.price*100:null;t.dir=p&&p.price!==t.price?(t.price>p.price?1:-1):0;
+  t.dOpen=opened[t.id]?(t.price-opened[t.id])/opened[t.id]*100:null;
+  if(p&&t.online&&p.online){const vc=p.vol?(t.vol-p.vol)/p.vol*100:null,lc=p.liq?(t.liq-p.liq)/p.liq*100:null,hc=p.hold?(t.hold-p.hold)/p.hold*100:null;
+   if(t.dPrev!=null&&Math.abs(t.dPrev)>=15)ev.push([t,"短线极端",`较上次 ${pc(t.dPrev)}，现价 ${fp(t.price)}`]);
+   if(vc!=null&&vc>=100&&t.vol>10000)ev.push([t,"成交放量",`成交额 ${pc(vc)} → ${fu(t.vol)}`]);
+   if(lc!=null&&Math.abs(lc)>=50)ev.push([t,"流动性异动",`流动性 ${pc(lc)} → ${fu(t.liq)}`]);
+   if(hc!=null&&Math.abs(hc)>=10&&t.hold>500)ev.push([t,"持有人异动",`持有人 ${pc(hc)} → ${t.hold}`]);}
+  if(pm&&p&&p.online&&!t.online)ev.push([t,"下线",t.fully?"已完全下架":"已下线"]);
+  if(pm&&t.online&&(!p||!p.online))ev.push([t,"新上线",`现价 ${fp(t.price)}，24h ${pc(t.pct)}`]);
+  if(t.online){if(alerts.up!==""&&alerts.up!=null&&t.pct>=+alerts.up)alertHit(t,"u",`${t.sym} 24h 涨幅 ${pc(t.pct)}`);
+   if(alerts.down!==""&&alerts.down!=null&&t.pct<=-Math.abs(+alerts.down))alertHit(t,"d",`${t.sym} 24h 跌幅 ${pc(t.pct)}`);
+   if(alerts.step!==""&&alerts.step!=null&&t.dPrev!=null&&Math.abs(t.dPrev)>=+alerts.step)alertHit(t,"s"+now,`${t.sym} 较上次刷新 ${pc(t.dPrev)}`);}}
+ const ids=new Set(list.map(t=>t.id));for(const k in hist)if(!ids.has(k)||now-hist[k][hist[k].length-1][0]>H_MAX)delete hist[k];
+ for(const [t,ty,m] of ev){events.unshift({ts:now,id:t.id,sym:t.sym,chain:t.chain,ty,m});if(ty==="短线极端"||ty==="新上线")alertHit(t,"e"+ty+now,`${t.sym} ${ty}：${m}`)}
+ events=events.slice(0,200);prev=list;tokens=list;SV("al_hist",hist);SV("al_open",opened);SV("al_ev",events);
+ const cs=[...new Set(list.map(t=>t.chain).filter(Boolean))].sort(),sel=$("chain"),cur=sel.value;
+ if(sel.options.length-1!==cs.length){sel.innerHTML='<option value="">全部链</option>'+cs.map(c=>`<option>${esc(c)}</option>`).join("");sel.value=cur}
+ render(true);if($("det").style.display==="block"&&detId)detail(detId);}
+function view(){const q=$("q").value.trim().toLowerCase(),ch=$("chain").value,off=$("showoff").checked;
+ let a=tokens.filter(t=>(off||t.online)&&(!ch||t.chain===ch)&&(!q||(t.sym||"").toLowerCase().includes(q)||(t.name||"").toLowerCase().includes(q)));
+ if(tab==="up")a.sort((x,y)=>y.pct-x.pct);else if(tab==="down")a.sort((x,y)=>x.pct-y.pct);else if(tab==="vol")a.sort((x,y)=>y.vol-x.vol);
+ else if(tab==="fav")a=a.filter(t=>favs.has(t.id)).sort((x,y)=>y.pct-x.pct);else a.sort((x,y)=>y.mc-x.mc);
+ return tab==="all"||tab==="fav"?a.slice(0,400):a.slice(0,100)}
+function render(fresh){if(tab==="ev"){$("list").style.display="none";$("feed").style.display="block";
+  $("feed").innerHTML=events.length?events.map(e=>`<div class="e" data-id="${esc(e.id)}"><span class="meta">${bj(e.ts)}</span> <b>${esc(e.sym)}</b> <span style="color:#f0b90b">${esc(e.ty)}</span> <span class="meta">${esc(e.chain)}</span><br>${esc(e.m)}</div>`).join(""):'<p class="note" style="padding:10px">暂无异动。需要至少两次刷新进行对比（规则同 alpha_check.py：较上次±15%、成交额+100%、流动性±50%、持有人±10%、上线/下线）。</p>';return}
+ $("list").style.display="block";$("feed").style.display="none";const a=view();
+ $("list").innerHTML=a.length?a.map(t=>{const f=fresh&&t.dir?(t.dir>0?" fu":" fd"):"";const ar=t.dir>0?'<span class="g">▲</span>':t.dir<0?'<span class="r">▼</span>':"";
+  return`<div class="t" data-id="${esc(t.id)}"><button class="star${favs.has(t.id)?" on":""}" data-s="${esc(t.id)}">★</button>
+  <div class="nm"><b>${esc(t.sym)}</b>${t.online?"":' <span class="r" style="font-size:11px">下线</span>'}<div>${esc(t.chain)} · 额 ${fu(t.vol)}</div><div>开页 <span class="${cl(t.dOpen)}">${pc(t.dOpen)}</span> · 上次 <span class="${cl(t.dPrev)}">${pc(t.dPrev)}</span></div></div>
+  ${spark(hist[t.id])}<div class="pr${f}"><div class="p">${ar}${fp(t.price)}</div></div><div class="ch ${t.pct>0?"bg":t.pct<0?"br":"bn"}">${pc(t.pct)}</div></div>`}).join(""):`<p class="note" style="padding:10px">${tokens.length?(tab==="fav"?"还没有收藏，点击 ★ 添加。":"无匹配结果。"):"加载中…"}</p>`;
+ if(fresh)requestAnimationFrame(()=>setTimeout(()=>document.querySelectorAll(".fu,.fd").forEach(e=>e.classList.remove("fu","fd")),50));}
+function status(){$("st").textContent=(lastOk?`更新于 ${bj(lastOk)}（北京时间）· `:"")+`${tokens.filter(t=>t.online).length}/${tokens.length} 在线 · `+(paused?"已暂停":`每 ${ivl} 秒刷新`);if(paused)$("dot").className="live off"}
+function schedule(){clearInterval(timer);if(!paused)timer=setInterval(load,ivl*1000);status()}
+let detId=null;
+function detail(id){const t=tokens.find(x=>x.id===id);if(!t)return;detId=id;const pos=t.hi>t.lo?Math.min(100,Math.max(0,(t.price-t.lo)/(t.hi-t.lo)*100)):50;
+ $("detin").innerHTML=`<div class="row"><h2 style="margin:0;flex:1">${esc(t.sym)} <span class="meta">${esc(t.name)}</span></h2><button class="star${favs.has(t.id)?" on":""}" data-s="${esc(t.id)}">★</button><button onclick="hide('det')">✕</button></div>
+ <div style="font-size:26px;margin:6px 0">${fp(t.price)} <span class="${cl(t.pct)}" style="font-size:16px">${pc(t.pct)}</span></div>
+ <div class="meta">开页以来 <span class="${cl(t.dOpen)}">${pc(t.dOpen)}</span> · 较上次 <span class="${cl(t.dPrev)}">${pc(t.dPrev)}</span>${t.online?"":' · <span class="r">已下线</span>'}</div>
+ <div class="meta" style="margin-top:8px">实时走势（本机记录，最长 2 小时，${(hist[t.id]||[]).length} 个点）</div><div>${spark(hist[t.id],320,90).replace('class="sp"','class="sp" ')}</div>
+ <div class="meta">24h 区间</div><div class="bar"><i style="left:calc(${pos}% - 2px)"></i></div><div class="row meta"><span style="flex:1">低 ${fp(t.lo)}</span><span>高 ${fp(t.hi)}</span></div>
+ <div class="kv"><div><span>链</span>${esc(t.chain)}</div><div><span>成交额 24h</span>${fu(t.vol)}</div><div><span>流动性</span>${fu(t.liq)}</div><div><span>持有人</span>${t.hold.toLocaleString()}</div><div><span>市值</span>${fu(t.mc)}</div><div><span>Alpha ID</span>${esc(t.id)}</div></div>
+ <button id="cp" style="width:100%;word-break:break-all;height:auto;padding:8px;text-align:left" data-ca="${esc(t.ca)}">合约（点击复制）：<br>${esc(t.ca)}</button>
+ <p class="note">24h K 线：币安 K 线接口不允许浏览器跨域访问，故未提供。</p>`;$("det").style.display="block"}
+function hide(id){$(id).style.display="none";if(id==="det")detId=null}
+function copy(s){(navigator.clipboard?navigator.clipboard.writeText(s):Promise.reject()).then(()=>toast("已复制合约地址")).catch(()=>{const ta=document.createElement("textarea");ta.value=s;document.body.appendChild(ta);ta.select();try{document.execCommand("copy");toast("已复制合约地址")}catch(e){}ta.remove()})}
+document.addEventListener("click",e=>{const s=e.target.closest("[data-s]");if(s){e.stopPropagation();const id=s.dataset.s;favs.has(id)?favs.delete(id):favs.add(id);SV("al_fav",[...favs]);render();if(detId)detail(detId);return}
+ if(e.target.closest("#cp")){copy(e.target.closest("#cp").dataset.ca);return}
+ const r=e.target.closest(".t,.e");if(r&&r.dataset.id){detail(r.dataset.id);return}
+ const tb=e.target.closest("#tabs button");if(tb){tab=tb.dataset.t;document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b===tb));render()}
+ if(e.target.classList.contains("sheet"))hide(e.target.id)});
+$("q").oninput=()=>render();$("chain").onchange=()=>render();$("showoff").onchange=()=>render();
+$("iv").value=ivl;$("iv").onchange=e=>{ivl=+e.target.value;SV("al_iv",ivl);schedule()};
+$("pause").onclick=()=>{paused=!paused;$("pause").textContent=paused?"继续":"暂停";if(!paused){$("dot").className="live";load()}schedule()};
+$("ref").onclick=()=>load();
+$("set").onclick=()=>{$("a1").value=alerts.up??"";$("a2").value=alerts.down??"";$("a3").value=alerts.step??"";$("afav").checked=!!alerts.favOnly;$("cfg").style.display="block"};
+$("asave").onclick=()=>{alerts={up:$("a1").value,down:$("a2").value,step:$("a3").value,favOnly:$("afav").checked};SV("al_alerts",alerts);hide("cfg");toast("提醒设置已保存")};
+$("anoti").onclick=()=>{if(!("Notification"in window))return toast("此浏览器不支持系统通知（iPhone 需先添加到主屏幕）");Notification.requestPermission().then(p=>toast(p==="granted"?"系统通知已开启":"未授权通知"))};
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&!paused&&Date.now()-lastOk>ivl*1000)load()});
+load();schedule();
+</script></body></html>
